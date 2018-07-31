@@ -5,6 +5,9 @@ import os
 import requests
 import time
 import re
+from PyQt5 import QtGui
+import ctypes
+import inspect
 from bs4 import BeautifulSoup as bs
 
 data = {
@@ -16,16 +19,20 @@ data = {
 
 class SpiderUI(QWidget):
     def __init__(self):
+        self.ThreadPool = []
+        self.DownloadCount = 0
+        self.loseCount = 0
         self.name = 'None'
         self.stop = False
         super().__init__()
-        self.setWindowTitle('cnkiSpider v1.0')
+        self.setWindowTitle('cnkiSpider v1.01')
         self.initUI()
-        self.setFixedSize(300, 250)
+        self.setFixedSize(300, 300)
         self.center()
         self.show()
 
     def initUI(self):
+        reviewsPositionY = 200
         self.PaperNameLabel = QLabel('请输入英文报纸简称:', self)
         self.PaperNameLabel.move(10, 10)
         # self.PaperNameLabel.show()
@@ -58,19 +65,36 @@ class SpiderUI(QWidget):
         self.interval.move(160, 30)
         self.interval.setText('2')
 
+        self.DownloadCountLabel = QLabel('已下载数：', self)
+        self.DownloadCountLabel.move(10, reviewsPositionY)
+
+        self.DownloadCountindex = QLabel('0', self)
+        self.DownloadCountindex.move(70, reviewsPositionY)
+
+        self.loseCountlabel = QLabel('失败数:', self)
+        self.loseCountlabel.move(10, reviewsPositionY+60)
+
+        self.loseCountindex = QLabel('0', self)
+        self.loseCountindex.move(70, reviewsPositionY+60)
+
+
         self.TotalNumLabel = QLabel('获取到的文件数:', self)
-        self.TotalNumLabel.move(10, 200)
+        self.TotalNumLabel.move(10, reviewsPositionY+20)
 
         self.TotalNum = QLabel('0', self)
-        self.TotalNum.move(110, 200)
+        self.TotalNum.move(110, reviewsPositionY+20)
 
         self.DownloadButton = QPushButton('开始下载', self)
-        self.DownloadButton.setGeometry(100, 150, 100, 50)
+        self.DownloadButton.setGeometry(20, 150, 100, 50)
         self.DownloadButton.clicked.connect(self.Start)
+
+        self.StopDownloadButton = QPushButton('停止下载', self)
+        self.StopDownloadButton.setGeometry(150, 150, 100, 50)
+        self.StopDownloadButton.clicked.connect(self.KillAllThread)
         # self.DownloadButton.show()
 
         self.ProcessLabel = QLabel('下载进度', self)
-        self.ProcessLabel.move(10, 220)
+        self.ProcessLabel.move(10, reviewsPositionY+40)
         # self.ProcessLabel.show()
 
 
@@ -80,6 +104,9 @@ class SpiderUI(QWidget):
                                             self.PaperName.text(),
                                             float(self.interval.text())))
 
+        self.ThreadPool.append(t)
+
+        t.setDaemon(True)
         t.start()
         time.sleep(1)
         t1 = threading.Thread(target=self.refresh)
@@ -111,6 +138,7 @@ class SpiderUI(QWidget):
 
 
     def init(self, startdate=20120101, enddate=20120130, papername='SXJJ', interval=2):
+        self.DownloadCount = 0
         self.papername = papername
         self.s = requests.session()
         self.name = 'None'
@@ -119,30 +147,47 @@ class SpiderUI(QWidget):
         self.PaperId = []
         # self.locatePage('', '')
 
-        self.PaperIdSet , self.PaperNamesSet = self.getArticleIDs(startdate, enddate, papername)
+        self.PaperIdSet , self.PaperNamesSet = self.getArticleIDs(startdate, enddate+1, papername)
         self.login('blueking08', 'blueking007')
         self.main(self.PaperIdSet, self.PaperNamesSet, interval)
 
     # main download function, receive a list of download indexes
     def main(self, IDs, Names, interval=2):
+        logPath = os.path.abspath('') + '/log.txt'
         dir_path = os.path.abspath('')+'/download'
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
         savepath_raw = os.path.abspath('')+'/download/'
         for item in enumerate(IDs):
-            self.name = Names[item[0]]
-            self.name = '正在下载:' + self.name
+            try:
+                self.name = Names[item[0]]
+                self.name = '正在下载:' + self.name
+                print('downloading:', item[1])
+                savepath = savepath_raw + Names[item[0]] + '.pdf'
+                if os.path.exists(savepath):
+                    self.DownloadCount += 1
+                    self.DownloadCountindex.setText(str(self.DownloadCount))
+                    self.DownloadCountindex.adjustSize()
+                    continue
+                downurl = 'http://wap.cnki.net/touch/web/Download/Article?id=' + item[1] + '&dbtype=CCND&dbname=CCNDPTEM&uid='
+                # print('downurl=', downurl)
+                content = self.s.get(downurl).content
+                f = open(savepath, 'wb')
+                f.write(content)
+                f.close()
+                self.DownloadCount += 1
+                self.DownloadCountindex.setText(str(self.DownloadCount))
+                self.DownloadCountindex.adjustSize()
+                time.sleep(interval)
 
-            print('downloading:', item[1])
-            savepath = savepath_raw + Names[item[0]] + '.pdf'
-            downurl = 'http://wap.cnki.net/touch/web/Download/Article?id=' + item[1] + '&dbtype=CCND&dbname=CCNDPTEM&uid='
-            # print('downurl=', downurl)
-            content = self.s.get(downurl).content
-            f = open(savepath, 'wb')
-            f.write(content)
-            f.close()
-            time.sleep(interval)
-        self.stop = True
+            except (OSError, IOError):
+                f1 = open(logPath, 'a+')
+                f1.write(self.name+'\n \r\n')
+                f1.close()
+                self.loseCount += 1
+                self.loseCountindex.setText(str(self.loseCount))
+                self.loseCountindex.adjustSize()
+                continue
     #login function
     def login(self, username, password):
         data['username'] = username
@@ -210,11 +255,23 @@ class SpiderUI(QWidget):
 
 
         for checkitem in enumerate(Names):
-            if '\r' in Names[checkitem[0]] or '\\' in Names[checkitem[0]] or '/' in Names[checkitem[0]] or '\n' in Names[checkitem[0]]:
-                Names[checkitem[0]] = 'manu' + checkitem[1]
+            Names[checkitem[0]] = Names[checkitem[0]].replace('*', '()')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('?', '(？)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace(':', '(：)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('\\', 'l')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('\r', 'r')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('<', '小于')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('>', '大于')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('|', 'l')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('”', '(引号)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('“', '(引号)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('"', '(引号)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('/', '(斜杠)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('%', '(百分号)')
+
         print(Names)
         # check the content of the lists
-        # print('final=')
+        # print('final=') 
         # for i in final:
         #     print(i)
         # print('Names=')
@@ -230,6 +287,32 @@ class SpiderUI(QWidget):
         # final is the IDSet. Names is the chinese title of the articles.
         return final, Names
 
+    def _async_raise(self, tid, exctype):
+        """raises the exception, performs cleanup if needed"""
+        tid = ctypes.c_long(tid)
+        if not inspect.isclass(exctype):
+            exctype = type(exctype)
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+        if res == 0:
+            raise ValueError("invalid thread id")
+        elif res != 1:
+            # """if it returns a number greater than one, you're in trouble,
+            # and you should call it again with exc=NULL to revert the effect"""
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+            raise SystemError("PyThreadState_SetAsyncExc failed")
+
+    def stop_thread(self, thread):
+        self._async_raise(thread.ident, SystemExit)
+
+    def KillAllThread(self):
+        for babies in self.ThreadPool:
+            self.stop_thread(babies)
+            time.sleep(0.2)
+        self.ThreadPool = []
+
+    def closeEvent(self, event):
+        self.KillAllThread()
+        event.accept()
 
 
 if __name__ == '__main__':
