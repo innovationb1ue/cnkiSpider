@@ -5,7 +5,6 @@ import os
 import requests
 import time
 import re
-from PyQt5 import QtGui
 import ctypes
 import inspect
 from bs4 import BeautifulSoup as bs
@@ -19,6 +18,7 @@ data = {
 
 class SpiderUI(QWidget):
     def __init__(self):
+        self.GetCount = 0
         self.ThreadPool = []
         self.DownloadCount = 0
         self.loseCount = 0
@@ -42,7 +42,7 @@ class SpiderUI(QWidget):
         self.PaperName.setText('SXJJ')
         # self.PaperName.show()
 
-        self.dateLabel = QLabel('请输入开始日期(20120101):', self)
+        self.dateLabel = QLabel('输入开始日期(20120101):(可输入年份下载全年)', self)
         self.dateLabel.move(10, 60)
         # self.dateLabel.show()
 
@@ -50,7 +50,7 @@ class SpiderUI(QWidget):
         self.startdate.move(10, 80)
         # self.startdate.show()
 
-        self.enddateLabel = QLabel('请输入结束日期(20120130):', self)
+        self.enddateLabel = QLabel('输入结束日期(20120130):(输入同一年份)', self)
         self.enddateLabel.move(10, 100)
         # self.enddateLabel.show()
 
@@ -105,7 +105,6 @@ class SpiderUI(QWidget):
                                             float(self.interval.text())))
 
         self.ThreadPool.append(t)
-
         t.setDaemon(True)
         t.start()
         time.sleep(1)
@@ -132,17 +131,22 @@ class SpiderUI(QWidget):
                 self.name_temp = self.name
             time.sleep(0.1)
 
+    def clearAll(self):
+        self.DownloadCount = 0
+        self.GetCount = 0
+        self.loseCount = 0
 
+        self.DownloadCountindex.setText('0')
+        self.TotalNum.setText('0')
+        self.loseCountindex.setText('0')
 
 #################################################################################################################################################
 
 
     def init(self, startdate=20120101, enddate=20120130, papername='SXJJ', interval=2):
-        self.DownloadCount = 0
         self.papername = papername
         self.s = requests.session()
         self.name = 'None'
-        # self.getArticleIDs(20120101, 20120131)
         self.login_url = 'http://wap.cnki.net/touch/usercenter/Account/Validator'
         self.PaperId = []
         # self.locatePage('', '')
@@ -150,6 +154,8 @@ class SpiderUI(QWidget):
         self.PaperIdSet , self.PaperNamesSet = self.getArticleIDs(startdate, enddate+1, papername)
         self.login('blueking08', 'blueking007')
         self.main(self.PaperIdSet, self.PaperNamesSet, interval)
+        selfthread = threading.current_thread()
+        self.ThreadPool.remove(selfthread)
 
     # main download function, receive a list of download indexes
     def main(self, IDs, Names, interval=2):
@@ -194,10 +200,10 @@ class SpiderUI(QWidget):
         data['password'] = password
         self.s.post(self.login_url, data=data)
 
-
-
-
     def getArticleIDs(self, startdate, enddate, papername):
+        if startdate == enddate-1 and len(str(startdate)) == 4:
+            ID, NE = self.getArticleIDsForYear(startdate, papername)
+            return ID, NE
         final = []
         Names = []
         for i in range(startdate, enddate):
@@ -253,7 +259,7 @@ class SpiderUI(QWidget):
             print('Getting:', i)
             self.name = 'Getting:' + str(i)
 
-
+        # process special symbols
         for checkitem in enumerate(Names):
             Names[checkitem[0]] = Names[checkitem[0]].replace('*', '()')
             Names[checkitem[0]] = Names[checkitem[0]].replace('?', '(？)')
@@ -281,11 +287,29 @@ class SpiderUI(QWidget):
         # check for the length of two lists
         print(len(final))
         print(len(Names))
-        self.TotalNum.setText(str(len(final)))
+
+        self.GetCount += len(final)
+
+        self.TotalNum.setText(str(self.GetCount))
         self.TotalNum.adjustSize()
 
         # final is the IDSet. Names is the chinese title of the articles.
         return final, Names
+
+    def getArticleIDsForYear(self, year, papername):
+        year = str(year)
+        tempIDs, tempNEs = [], []
+        IDs,Names = [], []
+        monthStart = ['0101', '0201', '0301', '0401', '0501', '0601', '0701', '0801', '0901', '1001', '1101', '1201']
+        monthEnd = ['0131', '0229', '0331', '0430', '0531', '0630', '0731', '0831', '0930', '1031', '1130', '1231']
+        for i in range(0, 12):
+            tempIDs, tempNEs = self.getArticleIDs(int(year+monthStart[i]), int(year+monthEnd[i])+1, papername)
+            IDs += tempIDs
+            Names += tempNEs
+
+        return IDs, Names
+
+
 
     def _async_raise(self, tid, exctype):
         """raises the exception, performs cleanup if needed"""
