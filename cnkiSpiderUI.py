@@ -25,6 +25,7 @@ class SpiderUI(QWidget):
         self.name = 'None'
         self.stop = False
         super().__init__()
+        self.ValidateUser()
         self.setWindowTitle('cnkiSpider v1.01')
         self.initUI()
         self.setFixedSize(300, 300)
@@ -97,6 +98,19 @@ class SpiderUI(QWidget):
         self.ProcessLabel.move(10, reviewsPositionY+40)
         # self.ProcessLabel.show()
 
+    def ValidateUser(self):
+        try:
+            Validate_resp = requests.session()
+            raw = Validate_resp.get('https://innovationb1ue.github.io/Validate.txt').content.decode('utf-8')
+            print(raw, type(raw))
+            if 'Certificate01' in raw:
+                return
+            else:
+                self.close()
+                sys.exit()
+        except:
+            self.close()
+            sys.exit()
 
     def Start(self):
         t = threading.Thread(target=self.init, args=(int(self.startdate.text()),
