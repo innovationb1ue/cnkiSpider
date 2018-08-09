@@ -263,9 +263,10 @@ class SpiderUI(QWidget):
         for checkitem in enumerate(Names):
             Names[checkitem[0]] = Names[checkitem[0]].replace('*', '()')
             Names[checkitem[0]] = Names[checkitem[0]].replace('?', '(？)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('\r', 'R')
+            Names[checkitem[0]] = Names[checkitem[0]].replace('\n', 'N')
             Names[checkitem[0]] = Names[checkitem[0]].replace(':', '(：)')
             Names[checkitem[0]] = Names[checkitem[0]].replace('\\', 'l')
-            Names[checkitem[0]] = Names[checkitem[0]].replace('\r', 'r')
             Names[checkitem[0]] = Names[checkitem[0]].replace('<', '小于')
             Names[checkitem[0]] = Names[checkitem[0]].replace('>', '大于')
             Names[checkitem[0]] = Names[checkitem[0]].replace('|', 'l')
@@ -274,17 +275,11 @@ class SpiderUI(QWidget):
             Names[checkitem[0]] = Names[checkitem[0]].replace('"', '(引号)')
             Names[checkitem[0]] = Names[checkitem[0]].replace('/', '(斜杠)')
             Names[checkitem[0]] = Names[checkitem[0]].replace('%', '(百分号)')
+            Names[checkitem[0]] = Names[checkitem[0]].replace(' ', 'o')
+
 
         print(Names)
-        # check the content of the lists
-        # print('final=') 
-        # for i in final:
-        #     print(i)
-        # print('Names=')
-        # for i in Names:
-        #     print(i)
 
-        # check for the length of two lists
         print(len(final))
         print(len(Names))
 
