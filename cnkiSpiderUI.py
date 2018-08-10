@@ -25,8 +25,8 @@ class SpiderUI(QWidget):
         self.name = 'None'
         self.stop = False
         super().__init__()
-        self.ValidateUser()
-        self.setWindowTitle('cnkiSpider v1.01')
+        # self.ValidateUser()
+        self.setWindowTitle('cnkiSpider v1.02')
         self.initUI()
         self.setFixedSize(300, 300)
         self.center()
@@ -215,9 +215,22 @@ class SpiderUI(QWidget):
         self.s.post(self.login_url, data=data)
 
     def getArticleIDs(self, startdate, enddate, papername):
+        # check whether only enter 4 digit to download the newspaper for whole year or not
         if startdate == enddate-1 and len(str(startdate)) == 4:
             ID, NE = self.getArticleIDsForYear(startdate, papername)
             return ID, NE
+        # download for two more continuous years
+        elif startdate != enddate-1 and len(str(startdate)) == 4:
+            ID, NE = [], []
+            for years in range(startdate, enddate):
+                IDtemp, NEtemp = self.getArticleIDsForYear(years, papername)
+                ID += IDtemp
+                NE += NEtemp
+            return ID, NE
+
+
+
+
         final = []
         Names = []
         for i in range(startdate, enddate):
@@ -241,10 +254,7 @@ class SpiderUI(QWidget):
                 self.paperID_full = self.papername[0] + u
                 final.append(self.paperID_full)
 
-            # pattern_name = r'item-div">"(.*?)"'
-            #
-            # Names_temp = re.findall(pattern_name, raw, re.S)
-            #
+
             Names += Names_temp
 
             # if in one day more than 20 articles published, need a method to process the extra data.
@@ -294,8 +304,8 @@ class SpiderUI(QWidget):
 
         print(Names)
 
-        print(len(final))
-        print(len(Names))
+        print('获取到ID:',len(final),)
+        print('获取到title:',len(Names))
 
         self.GetCount += len(final)
 
